@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Madrid rooftop solar — the city</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css">
+<style>
+/* ------------------------------------------------------------------ *
+ * The public map defaults to a light architect's plan so cast shadows
+ * remain legible; the dark palette remains available as an explicit option.
+ * ------------------------------------------------------------------ */
+:root{
+  --ink:#EFEAE0; --surface:#F7F4ED; --surface-2:#FFFFFF;
+  --hairline:#D4CCBC; --hairline-2:#B9AF9B;
+  --text:#1A1712; --text-2:#5C554A; --text-3:#8A8275;
+  --sun-0:#6E5FA8; --sun-1:#C07A2E; --sun-2:#E0A33E; --sun-3:#7A5A10;
+  --alert:#A83A22; --good:#37725B;
+  --outside:#CFC7B6;
+  --basemap-filter:grayscale(.72) brightness(1.03) contrast(.86) saturate(.5);
+}
+:root[data-theme="dark"]{
+  --ink:#0E1116; --surface:#161B23; --surface-2:#1C2230;
+  --hairline:#263041; --hairline-2:#333F55;
+  --text:#E4E8F0; --text-2:#9AA4B8; --text-3:#66708A;
+  --sun-0:#2E2358; --sun-1:#8A4A22; --sun-2:#C9822A; --sun-3:#F2E3B8;
+  --alert:#D45438; --good:#5FA98B; --outside:#0A0D13;
+  --basemap-filter:invert(1) hue-rotate(185deg) brightness(.52) contrast(.92) saturate(.28);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%}
+body{
+  background:var(--ink); color:var(--text);
+  font-family:'Archivo',system-ui,-apple-system,'Segoe UI',sans-serif;
+  font-size:15px; line-height:1.55; font-variant-numeric:tabular-nums;
+  -webkit-font-smoothing:antialiased; overflow:hidden;
+}
+.num{font-variant-numeric:tabular-nums}
+
+/* ---- readout strip ---- */
+.strip{
+  display:flex; flex-wrap:wrap; align-items:baseline; gap:0 26px;
+  padding:calc(11px + env(safe-area-inset-top,0px)) 20px 11px;
+  border-bottom:1px solid var(--hairline); background:var(--surface);
+  position:relative; z-index:30;
+}
+.strip .place{font-weight:700; letter-spacing:-.01em}
+.strip .coord{color:var(--text-3); font-size:12.5px}
+.strip .spacer{flex:1 1 auto}
+.strip .rd{display:flex; gap:7px; align-items:baseline}
+.strip .rd b{font-weight:600; font-size:16.5px}
+.strip .rd span{color:var(--text-3); font-size:12px}
+button.ghost{
+  background:none; border:1px solid var(--hairline-2); color:var(--text-2);
+  border-radius:2px; padding:4px 10px; font:inherit; font-size:12px; cursor:pointer;
+}
+button.ghost:hover{color:var(--text); border-color:var(--text-3)}
+
+/* ---- stage ---- */
+.stage{display:grid; grid-template-columns:minmax(0,1fr) 340px; height:calc(100% - 52px)}
+@media (max-width:980px){
+  .stage{grid-template-columns:1fr; grid-template-rows:minmax(0,1fr) auto; height:calc(100% - 52px)}
+}
+#map{width:100%; height:100%; background:var(--outside)}
+.mapwrap{position:relative; min-height:0}
+
+/* The raster basemap is recoloured in CSS rather than swapped for a styled
+   vector source: it keeps the page to one dependency and one tile host. */
+.maplibregl-canvas-container canvas{outline:none}
+#map .basemap-dim{filter:var(--basemap-filter)}
+
+.overlay{
+  position:absolute; left:14px; top:12px; z-index:5; max-width:40ch;
+  font-size:11px; line-height:1.45; color:var(--text-2);
+  background:color-mix(in srgb, var(--surface) 90%, transparent);
+  border:1px solid var(--hairline); border-radius:2px; padding:7px 10px;
+  pointer-events:none;
+}
+.legend{
+  position:absolute; right:14px; bottom:calc(14px + env(safe-area-inset-bottom,0px));
+  z-index:5; font-size:11px; color:var(--text-3); text-align:right;
+  background:color-mix(in srgb, var(--surface) 90%, transparent);
+  border:1px solid var(--hairline); border-radius:2px; padding:7px 10px;
+}
+.ramp{height:6px; width:148px; margin:4px 0 2px auto; border-radius:1px;
+  background:linear-gradient(90deg,var(--sun-0),var(--sun-1),var(--sun-2),var(--sun-3))}
+.zoomhint{
+  position:absolute; left:50%; transform:translateX(-50%);
+  bottom:calc(16px + env(safe-area-inset-bottom,0px)); z-index:5;
+  font-size:11.5px; color:var(--text-2); padding:6px 12px;
+  background:color-mix(in srgb, var(--surface) 92%, transparent);
+  border:1px solid var(--hairline); border-radius:2px;
+  transition:opacity .25s; pointer-events:none;
+}
+@media (max-width:700px){ .overlay{display:none} }
+
+/* ---- rail ---- */
+.rail{
+  border-left:1px solid var(--hairline); background:var(--surface);
+  padding:16px 18px calc(22px + env(safe-area-inset-bottom,0px));
+  overflow-y:auto; display:flex; flex-direction:column; gap:16px;
+}
+@media (max-width:980px){
+  .rail{border-left:none; border-top:1px solid var(--hairline); max-height:38vh}
+}
+.rail h3{margin:0 0 8px; font-size:11.5px; font-weight:600; color:var(--text-2);
+  text-transform:uppercase; letter-spacing:.06em}
+.rail p{margin:0 0 8px; font-size:12.5px; color:var(--text-2)}
+.card{border:1px solid var(--hairline); border-radius:2px; padding:11px 12px;
+  background:var(--surface-2)}
+.kv{display:flex; justify-content:space-between; gap:10px; padding:3px 0;
+  font-size:12.5px; border-bottom:1px solid color-mix(in srgb,var(--hairline) 60%,transparent)}
+.kv:last-child{border-bottom:none}
+.kv span{color:var(--text-3)}
+.kv b{font-weight:600}
+.seg{display:flex; gap:0; border:1px solid var(--hairline-2); border-radius:2px; overflow:hidden}
+.seg button{flex:1; background:none; border:none; border-right:1px solid var(--hairline);
+  color:var(--text-2); padding:6px 4px; font:inherit; font-size:11.5px; cursor:pointer}
+.seg button:last-child{border-right:none}
+.seg button[aria-pressed="true"]{background:var(--sun-1); color:#fff}
+.sun-control{display:grid;grid-template-columns:1fr auto;gap:5px 10px;align-items:center}
+.sun-control label{font-size:12px;color:var(--text-2)}
+.sun-control output{font-size:12px;font-weight:600}
+.sun-control input{grid-column:1 / -1;width:100%;accent-color:var(--sun-2)}
+.story{font-size:12.5px;color:var(--text-2);line-height:1.55}
+.story strong{color:var(--text)}
+.research{max-width:1080px;margin:0 auto;padding:48px 28px 80px;color:var(--text-2)}
+.research h1,.research h2,.research h3{color:var(--text);line-height:1.15}
+.research h1{font-size:clamp(28px,4vw,48px);max-width:760px;letter-spacing:-.03em}
+.research h2{font-size:25px;margin:48px 0 16px}
+.research h3{font-size:18px;margin:30px 0 8px}
+.research p,.research li{max-width:80ch;font-size:15px;line-height:1.7}
+.research .lede{font-size:19px;max-width:72ch}
+.research table{border-collapse:collapse;width:100%;font-size:13px;margin:18px 0 28px}
+.research th,.research td{padding:8px 10px;border-bottom:1px solid var(--hairline);text-align:left}
+.research th{color:var(--text-2);font-weight:600}
+.research .finding{display:grid;grid-template-columns:130px 1fr;gap:22px;border-top:1px solid var(--hairline);padding:18px 0}
+.research .fig{font-size:30px;color:var(--sun-3);font-weight:700}
+.research .fig small{display:block;font-size:11px;color:var(--text-3);font-weight:400}
+.research .note{border-left:3px solid var(--sun-2);padding:12px 16px;background:var(--surface);margin:24px 0;max-width:82ch}
+@media(max-width:700px){.research{padding:32px 18px 60px}.research .finding{grid-template-columns:1fr;gap:4px}.research table{font-size:12px;display:block;overflow-x:auto;white-space:nowrap}}
+.muted{color:var(--text-3); font-size:11.5px; line-height:1.5}
+.swatch{display:inline-block; width:9px; height:9px; border-radius:1px;
+  margin-right:5px; vertical-align:baseline}
+.err{border-color:var(--alert); color:var(--alert)}
+</style>
+</head>
+<body>
+
+<div class="strip">
+  <div>
+    <div class="place">Madrid rooftop solar — the city</div>
+    <div class="coord" id="subhead">loading…</div>
+  </div>
+  <div class="spacer"></div>
+  <div class="rd"><b id="rdPanels">—</b><span>panels modelled</span></div>
+  <div class="rd"><b id="rdMwp">—</b><span>MWp</span></div>
+  <div class="rd"><b id="rdGwh">—</b><span>GWh/yr</span></div>
+  <button class="ghost" id="themeBtn">theme</button>
+</div>
+
+<div class="stage">
+  <div class="mapwrap">
+    <div id="map"></div>
+    <div class="overlay" id="overlay">
+      Every building in the extract is drawn. Colour is modelled annual yield
+      per panel; grey roofs are outside the model — not residential, not flat,
+      or below the 120 m² floor where a job stops being worth mobilising for.
+    </div>
+    <div class="zoomhint" id="zoomhint">Zoom in to resolve individual panels</div>
+    <div class="legend">
+      <div id="legendTitle">annual yield per panel</div>
+      <div class="ramp"></div>
+      <div><span id="rampLo">—</span> &nbsp;→&nbsp; <span id="rampHi">—</span> kWh</div>
+      <div style="margin-top:5px"><span class="swatch" style="background:#6b7280"></span>outside the model</div>
+    </div>
+  </div>
+
+  <div class="rail">
+    <div class="card">
+      <h3>Sun and shadows</h3>
+      <div class="sun-control">
+        <label for="day">Day of year</label><output id="dayOut">21 Jun</output>
+        <input id="day" type="range" min="1" max="365" value="172" aria-label="Day of year">
+        <label for="hour">Local time</label><output id="hourOut">14:15</output>
+        <input id="hour" type="range" min="300" max="1320" step="5" value="855" aria-label="Local time">
+      </div>
+      <p class="muted" style="margin-top:8px">The dark overlay is the geometric shadow cast by every building at this date and time. It is a 2D footprint projection, not a 3D rendering.</p>
+    </div>
+
+    <div class="card story">
+      <strong>The question</strong><br>
+      If a British electricity supplier moved into Spain, would the same rooftop product work — and what breaks first? The answer is not sunshine. It is roof per household, the value of a self-consumed kilowatt-hour, and the owner vote needed to use a common roof.
+    </div>
+
+    <div>
+      <h3>Colour by</h3>
+      <div class="seg" id="modeSeg">
+        <button data-mode="yield" aria-pressed="true">yield</button>
+        <button data-mode="density" aria-pressed="false">kWp / dwelling</button>
+        <button data-mode="prov" aria-pressed="false">height source</button>
+      </div>
+    </div>
+
+    <div class="card" id="selCard">
+      <h3 style="margin-bottom:6px">Selection</h3>
+      <p class="muted" id="selHint">Click any roof for its modelled numbers.</p>
+      <div id="selBody" hidden></div>
+    </div>
+
+    <div class="card" id="econCard">
+      <h3>Building economics</h3>
+      <p class="muted">Select a modelled building. Its panel count, live shadow losses and value update with the date and time above.</p>
+      <div id="econBody" class="muted">No building selected.</div>
+    </div>
+
+    <div class="card">
+      <h3>This extract</h3>
+      <div class="kv"><span>buildings drawn</span><b id="mBuildings">—</b></div>
+      <div class="kv"><span>roofs modelled</span><b id="mSimulated">—</b></div>
+      <div class="kv"><span>panels</span><b id="mPanels">—</b></div>
+      <div class="kv"><span>capacity</span><b id="mKwp">—</b></div>
+      <div class="kv"><span>generation</span><b id="mGwh">—</b></div>
+      <div class="kv"><span>dwellings served</span><b id="mDwell">—</b></div>
+      <div class="kv"><span>kWp per dwelling</span><b id="mPerDwell">—</b></div>
+      <div class="kv"><span>simulation time</span><b id="mSim">—</b></div>
+    </div>
+
+    <div>
+      <h3>What you are looking at</h3>
+      <p class="muted">
+        Every roof here was run through the same chain as the single block in
+        this study: NOAA sun position, Ineichen–Perez clear sky, day-type
+        clearness, Erbs split, Hay–Davies transposition, a geometric horizon
+        built from the real neighbouring footprints, Faiman cell temperature.
+        No kWh/kWp lookup anywhere.
+      </p>
+      <p class="muted">
+        Shading is computed against <em>every</em> building in the extract,
+        including the ones that carry no panels — a church or an office still
+        casts a shadow. That is why they are drawn.
+      </p>
+      <p class="muted" id="provNote">
+        Heights are mostly inferred from typology rather than measured. Switch
+        the colour mode to <em>height source</em> to see which roofs are which.
+      </p>
+    </div>
+
+    <div class="card story">
+      <strong>What the model found</strong><br>
+      More sun does not mean more value: a Spanish avoided kilowatt-hour is worth about half a British one. A collective rooftop system can pay back because fixed costs are shared; a one-flat installation cannot. Batteries improve self-consumption but do not pay for themselves on the retail spread. The deployment constraint is a junta de propietarios vote, so this is an operations problem as much as an engineering one.
+    </div>
+
+    <div>
+      <h3>Caveat</h3>
+      <p class="muted">
+        This is a case study, not a survey. The Ensanche typology the model was
+        calibrated on does not hold across every district here, dwelling counts
+        are derived rather than counted, and roof obstructions are a flat
+        haircut. Read the numbers as ranges.
+      </p>
+    </div>
+  </div>
+</div>
+
+<main class="research">
+<h1>Madrid has 1.8× Britain's sunshine and a fifth of the value per household.</h1>
+<p class="lede">This is a case study, not a proposal. I built a rooftop photovoltaic model for Madrid from the sun's position upward, to find out whether a rooftop product designed for British houses works in a Spanish apartment city. It does not, and the reason has almost nothing to do with sunlight.</p>
+<p>The model computes solar position from NOAA/Meeus, clear-sky irradiance from Ineichen–Perez, the beam/diffuse split from Erbs, and plane-of-array irradiance from Hay–Davies. It casts shadows geometrically from real building footprints, panel by panel, hour by hour, and prices output under the Spanish 2.0TD tariff and Real Decreto 244/2019. Every input lives in <code>config/madrid.yaml</code> with a source and confidence label.</p>
+
+<h2>Economics, not just generation</h2>
+<p>A panel only earns its avoided retail price when somebody is using the electricity. In the model, self-consumed energy is valued at the demand-weighted Spanish 2.0TD price of <b>€0.133/kWh</b>; exported energy is valued at <b>€0.05/kWh</b> and is capped monthly by imported energy. The live building card applies a transparent 70% self-consumption / 30% export split to each selected building and reports gross energy value, not accounting profit.</p>
+<table><thead><tr><th>Case</th><th>Model result</th><th>Economic meaning</th></tr></thead><tbody>
+<tr><td>Single flat</td><td>3 panels · €4.16/Wp</td><td>Never pays back because fixed inverter, scaffold and legalisation costs dominate</td></tr>
+<tr><td>Collective roof</td><td>€0.64/Wp · €908 per dwelling</td><td><b>4.3-year</b> indicative payback before maintenance and financing</td></tr>
+<tr><td>Battery</td><td>€307,000 · 25-year payback</td><td>Raises self-consumption 46% → 99%, but does not pay for itself on retail spread</td></tr>
+<tr><td>Balcony kit</td><td>€620 · 7.4-year payback</td><td>Two 400 W panels yield 765 kWh/year without roof rights; regulation remains uncertain</td></tr>
+</tbody></table>
+
+<h2>Calibration first</h2>
+<p>The model is fitted on twelve monthly global-horizontal-irradiance numbers and checked against two figures it never saw. That separates a real physical model from a fit silently absorbing its own error.</p>
+<table><thead><tr><th>Check</th><th>Model</th><th>Reference</th><th>Error</th></tr></thead><tbody>
+<tr><td>Annual GHI, horizontal (fitted)</td><td>1,791</td><td>1,791 kWh/m²</td><td>—</td></tr>
+<tr><td>Plane of array at 37° / −6° (independent)</td><td><b>2,087</b></td><td>2,093 kWh/m²</td><td><b>−0.3%</b></td></tr>
+<tr><td>Specific yield, unshaded (independent)</td><td><b>1,776</b></td><td>1,800 kWh/kWp</td><td><b>−1.3%</b></td></tr>
+<tr><td>Annual diffuse fraction</td><td>0.298</td><td>0.30–0.33 literature</td><td>—</td></tr>
+<tr><td>Equinox noon altitude (theory)</td><td>49.9°</td><td>90 − 40.43 = 49.57°</td><td>refraction</td></tr>
+<tr><td>Equinox day length (theory)</td><td>12.20 h</td><td>12 h + limb</td><td>—</td></tr></tbody></table>
+<p><b>Solar noon in Madrid falls at 14:15 in June</b>, because the city sits roughly 15° west of the centre of its time zone. A south-facing array therefore peaks inside the afternoon peak tariff band.</p>
+
+<h2>Seven findings</h2>
+<div class="finding"><div class="fig">0.97<small>kWp per dwelling</small></div><div><h3>Roof area per household, not sunshine, is the Spanish constraint</h3><p>93 addressable roofs on the block carry 2,492 kWp across an estimated 2,580 dwellings—about 1,600 kWh a year each. A British semi-detached house has roughly 4 kWp. Six floors sharing one roof cancels most of Iberia's solar advantage.</p></div></div>
+<div class="finding"><div class="fig">€0.133<small>vs €0.305 in GB</small></div><div><h3>A Spanish kilowatt-hour avoided is worth about half a British one</h3><p>44% of household demand falls in the cheap <em>valle</em> band at €0.093/kWh, giving a demand-weighted avoided price of €0.133. The GB unit rate is 26.11p, about €0.305. One household's rooftop is worth roughly <b>€213 a year in Madrid against €1,160 in Britain</b>.</p></div></div>
+<div class="finding"><div class="fig">2.7 : 1<small>kept vs exported</small></div><div><h3>The economics turn on self-consumption, not irradiance</h3><p>A self-consumed kWh avoids the full retail price; an exported one earns about €0.05, capped monthly at the value imported, with surplus forfeited. The household load curve matters more than the exact sun curve: dinner is at 21:30, not 19:00.</p></div></div>
+<div class="finding"><div class="fig">4.3 yr<small>vs never, alone</small></div><div><h3>The product is a signed resolution from a comunidad de propietarios</h3><p>One flat fitting three panels pays €4.16/Wp and never pays back because €4,800 of inverter, scaffold, electrical board and legalisation does not shrink. The collective installation pays €0.64/Wp, <b>€908 per household, back in 4.3 years</b>. Same hardware, same sun; the difference is who signed.</p></div></div>
+<div class="finding"><div class="fig">25 yr<small>storage payback</small></div><div><h3>A domestic battery is a poor household investment and a good trading asset</h3><p>Storage lifts self-consumption from 46% to 99% and earns about €12,200 a year more. It costs €307,000: a 25-year payback. To reach eight years it needs another €26,000 a year from balancing, capacity or wholesale spreads.</p></div></div>
+<div class="finding"><div class="fig">0%<small>of 800 W cap used</small></div><div><h3>The plug-in kit routes around the constraint</h3><p>A vertical south-facing panel in a 20 m street yields 382 kWh—49% less than the roof. Two make 765 kWh/year and the 800 W inverter cap clips exactly nothing. A €620 kit pays back in 7.4 years with no roof rights, junta vote, scaffold, installer or electrical certificate.</p></div></div>
+<div class="finding"><div class="fig">2.3%<small>all urban shading</small></div><div><h3>Dense-city shading barely matters here</h3><p>68% of the PVGIS gap is the deliberate flat tilt that fits 67% more panels; 26% is neighbouring buildings, 5% row spacing and 0.5% parapet. All urban obstruction costs 2.3%, not the 15–25% intuition suggests. The uniform cornice line keeps roofs above neighbours' shadows; the streets are dark all winter and roofs are in full sun.</p></div></div>
+<table><thead><tr><th>Adding one obstruction</th><th>kWh/panel</th><th>vs open at 15°</th></tr></thead><tbody>
+<tr><td>Open horizon, 37° (PVGIS optimum)</td><td>799.3</td><td>—</td></tr><tr><td>Open horizon, 15° (chosen)</td><td>762.0</td><td>—</td></tr><tr><td>+ neighbouring buildings</td><td>748.0</td><td>−1.83%</td></tr><tr><td>+ own parapet</td><td>747.8</td><td>−1.87%</td></tr><tr><td>+ row self-shading, as built</td><td><b>744.7</b></td><td><b>−2.27%</b></td></tr></tbody></table>
+<p>At the December solstice, 16:30, the original 5,538-panel block view found 5,493 panels still in direct sun: streets can be dark while roofs remain productive. Shading bites where the cornice line breaks, especially around post-1960 towers on the Castellana axis.</p>
+<div class="note"><b>Height provenance is visible, not hidden.</b> In the original block extract, six of 100 buildings carried an OSM floor count and the other 94 had heights inferred from typology. The city extract improves this to 33.5% measured or floor-count provenance, but heights remain the clearest data limitation.</div>
+
+<h2>The constraint</h2><p>Not irradiance, module cost or grid connection. The roof is a <b>common element</b> under the Ley de Propiedad Horizontal. Selling means winning a junta de propietarios vote—one third of owners and one third of ownership quotas—on roughly a 40-day meeting cycle. 28% of households are tenants who cannot authorise it. Deployment is therefore set by the sales cycle, so the first measures are time to signed resolution, junta conversion and internal champions.</p>
+
+<h2>Two results I did not expect</h2>
+<h3>The per-panel tilt optimum is not the per-roof optimum</h3><p>At 37° a panel earns about 4% more than at 15° but needs 2.4× the row pitch, so half as many fit. The roof is scarce, not the module.</p>
+<table><thead><tr><th>Tilt</th><th>Panels</th><th>kWh/panel</th><th>Roof total</th><th>Index</th></tr></thead><tbody><tr><td>5°</td><td>583</td><td>712</td><td>415,175</td><td><b>100%</b></td></tr><tr><td>10°</td><td>460</td><td>737</td><td>338,998</td><td>82%</td></tr><tr><td>15° chosen</td><td>370</td><td>757</td><td>280,040</td><td>67%</td></tr><tr><td>25°</td><td>286</td><td>781</td><td>223,464</td><td>54%</td></tr><tr><td>37° PVGIS optimum</td><td>222</td><td>785</td><td>174,189</td><td>42%</td></tr></tbody></table>
+<p>Below 10° rain stops clearing glass and the constant 2.5% soiling loss would roughly double in summer. <b>15° is practical; the binding reason is maintenance, not physics.</b> Worst-to-best panel spans 26%, sky-view factor 0.77–0.98, and marginal cost is flat at €277 while average cost runs from €11.24/Wp for one panel to €0.95/Wp at 32.</p>
+
+<h2>Where I was wrong</h2><ol><li><b>Diffuse irradiance:</b> a monthly mean fed into a convex Erbs correlation overstated diffuse fraction at 0.41 versus about 0.31 and pushed POA 7.5% below PVGIS. Day-type mixtures fixed it and gave the battery genuine consecutive overcast days.</li><li><b>East and west:</b> a negation swapped them. Totals barely moved, but morning obstructions were on the wrong side. A direct 08:00 test caught it.</li><li><b>Wrong denominator:</b> a whole block roof was measured against one household, collapsing self-consumption to 8%. Collective self-consumption is the correct frame.</li><li><b>Withdrawn claim:</b> pooling 118 households raised self-consumption only 44% → 46%; diversity smooths the evening peak, not the midday solar surplus. The gain is cost amortisation.</li><li><b>€620 balcony kit:</b> rooftop maintenance and inverter replacement were incorrectly charged to it, turning a 7.4-year payback into 26 years.</li><li><b>Undensified edges:</b> sampling building outlines only at their vertices let sunlight through the middle of long facades, inflating winter yield on courtyard roofs. Densifying every edge fixed the geometry.</li></ol>
+
+<h2>What would have to be true for this to be wrong</h2>
+<table><thead><tr><th>Input</th><th>Low</th><th>High</th><th>Swing in payback</th></tr></thead><tbody><tr><td>Export compensation</td><td>€0.03</td><td>€0.10</td><td><b>4.8 → 3.3 yr (1.5)</b></td></tr><tr><td>Labour per panel</td><td>€60</td><td>€130</td><td><b>3.6 → 5.1 yr (1.5)</b></td></tr><tr><td>Module price</td><td>€35</td><td>€75</td><td>3.9 → 4.7 yr (0.9)</td></tr><tr><td>Installer margin</td><td>15%</td><td>35%</td><td>3.9 → 4.5 yr (0.7)</td></tr><tr><td>Real price drift</td><td>0%</td><td>4%</td><td>4.4 → 4.1 yr (0.3)</td></tr><tr><td>Roof access</td><td>€400</td><td>€1,600</td><td>4.2 → 4.3 yr (0.1)</td></tr><tr><td>Soiling</td><td>1%</td><td>5%</td><td>4.2 → 4.3 yr (0.1)</td></tr></tbody></table>
+<p>Every input at the top is commercial or regulatory, not physical. The physics is the easy half.</p>
+<div class="note"><b>Named failure modes:</b> the load curve is synthetic and self-consumption is the most valuable output; dwellings per building are derived rather than counted; 94% of heights are inferred; shading is binary per panel rather than per cell string; the rooftop obstruction share of 22% was eyeballed from aerial imagery on one block; tariff bands are assumed to survive thirty years; July clearness is 0.98 of clear sky; and one Ensanche block cannot represent Vallecas or the post-war periphery.</div>
+
+<h2>One question I could not settle</h2><p>Whether a plug-in kit under 800 W is exempt from Spanish self-consumption formalities is <b>genuinely disputed in the sources</b>. Retail and comparison material widely states that installations up to 800 W of inverter output follow a simplified route with no technical project and no certified installer, on the German VDE-AR-N 4105 model. The more careful reading is that RD 244/2019 creates no such exemption: the 800 VA threshold appears in ITC-BT-40 as an independent-circuit requirement in certain no-export cases, not as a permit exemption.</p><p>Whether the community must authorise it depends on whether the balcony railing is private or common under the title deeds. This is a real commercial risk to a product whose advantage is avoiding paperwork; one call to a Spanish energy lawyer should close it.</p>
+
+<h2>Method</h2><table><thead><tr><th>Module</th><th>What it does</th><th>Why it is not a library call</th></tr></thead><tbody><tr><td>solar_geometry</td><td>NOAA/Meeus position, sunrise, incidence</td><td>Checked against arithmetic that cannot be wrong</td></tr><tr><td>irradiance</td><td>Clear sky, day types, diffuse split, transposition</td><td>The beam/diffuse split is what a tilted urban panel lives on</td></tr><tr><td>shading</td><td>Per-panel horizon, beam mask, sky view factor</td><td>A flat percentage loss is wrong for a street</td></tr><tr><td>roof_model</td><td>OSM ingest, height provenance, packing</td><td>Usable roof fraction is where optimism enters</td></tr><tr><td>panel</td><td>Faiman temperature, losses, degradation</td><td>Urban roofs get less wind cooling</td></tr><tr><td>demand</td><td>Spanish load shapes, tariff bands, diversified aggregate</td><td>Value depends on the hour, not just kWh</td></tr><tr><td>economics</td><td>Marginal capex, dispatch, RD 244/2019 cap, returns</td><td>Cost and value are not linear in panels or kWh</td></tr></tbody></table><p>The city run uses a spatial grid because the original neighbour search was quadratic, parallel building simulations, and 166 tiles because all panels as one JSON would approach a gigabyte.</p>
+<h2>Prior art</h2><p>A 2025 Bocconi Students for Machine Learning project by Bryan Bisetti, Andrea Duico and Filip Juren trained a U-Net to segment rooftops for PV suitability, training on Ljubljana and testing on Milan. It reported about 95% training accuracy and 85% IoU, against sub-80% validation accuracy and roughly 50% validation IoU, failing on sloped roofs. Its stated next step was azimuth and 3D geometry.</p><p>A rooftop mask tells you area; it does not tell you tilt, azimuth or what the building opposite is doing at four o'clock in December. This model starts with OSM footprints and spends effort on geometry and economics instead; segmentation would earn its place generating footprints and obstruction maps at city scale.</p>
+<p><b>Sources:</b> EU PVGIS v5.3/SARAH2; AEMET; Ineichen &amp; Perez; Erbs; Hay &amp; Davies; Faiman; NOAA/Meeus; Real Decreto 244/2019; ITC-BT-40; Ley de Propiedad Horizontal art. 17.1; Madrid IBI/ICIO ordinances; Ofgem price cap; Eurostat Housing 2025; INE; OpenStreetMap contributors (ODbL).</p>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js"></script>
+<script>
+/* =====================================================================
+ * The city map.
+ *
+ * Two levels of detail, because the data has two very different sizes:
+ *   - buildings  : one summary row each, shipped in city.json, always on
+ *   - panels     : per-tile files, fetched only for what is on screen and
+ *                  only past the zoom where an individual panel is bigger
+ *                  than a pixel
+ * The whole city as one payload is about a gigabyte, so the tiling is not
+ * an optimisation, it is the thing that makes the page possible at all.
+ * ===================================================================== */
+const CITY = __CITY_JSON__;
+const TILE_BASE = __TILE_BASE__;
+
+const PANEL_ZOOM = 16.4;          // below this, panels are sub-pixel
+const TILE_DEG = CITY.meta.tile_deg;
+const RAD = Math.PI / 180;
+const DIM = [31,28,31,30,31,30,31,31,30,31,30,31];
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+let shadowDoy = 172, shadowMinutes = 855;
+
+function monthDay(doy){
+  let m=0, d=doy;
+  while(d > DIM[m]) { d -= DIM[m]; m++; }
+  return [m + 1, d];
+}
+function julianDay(doy, hourUtc){
+  const md = monthDay(doy); let y = 2026, m = md[0];
+  if(m <= 2) { y--; m += 12; }
+  const a = Math.floor(y/100), b = 2-a+Math.floor(a/4);
+  return Math.floor(365.25*(y+4716))+Math.floor(30.6001*(m+1))+md[1]+b-1524.5+hourUtc/24;
+}
+function sunPosition(doy, localHour){
+  const offset = doy >= 86 && doy <= 303 ? 2 : 1;
+  const t = (julianDay(doy, localHour-offset)-2451545)/36525;
+  const l0 = (280.46646+t*(36000.76983+t*0.0003032))%360;
+  const mm = 357.52911+t*(35999.05029-0.0001537*t), mr = mm*RAD;
+  const c = Math.sin(mr)*(1.914602-t*(0.004817+0.000014*t))
+    + Math.sin(2*mr)*(0.019993-0.000101*t) + Math.sin(3*mr)*0.000289;
+  const omega = 125.04-1934.136*t;
+  const app = l0+c-0.00569-0.00478*Math.sin(omega*RAD);
+  const sec = 21.448-t*(46.815+t*(0.00059-t*0.001813));
+  const eps = 23+(26+sec/60)/60+0.00256*Math.cos(omega*RAD);
+  const decl = Math.asin(Math.sin(eps*RAD)*Math.sin(app*RAD))/RAD;
+  const y = Math.tan(eps*RAD/2)**2;
+  const ecc = 0.016708634-t*(0.000042037+0.0000001267*t);
+  const eq = 4*((y*Math.sin(2*l0*RAD)-2*ecc*Math.sin(mr)
+    +4*ecc*y*Math.sin(mr)*Math.cos(2*l0*RAD)-0.5*y*y*Math.sin(4*l0*RAD)
+    -1.25*ecc*ecc*Math.sin(2*mr))/RAD);
+  let tst = ((localHour-offset)*60+eq+4*(-3.6883))%1440;
+  if(tst < 0) tst += 1440;
+  const ha = tst/4-180, lat = 40.4313*RAD, dr = decl*RAD, hr = ha*RAD;
+  let cz = Math.sin(lat)*Math.sin(dr)+Math.cos(lat)*Math.cos(dr)*Math.cos(hr);
+  cz = Math.max(-1,Math.min(1,cz));
+  const zen = Math.acos(cz)/RAD, alt = 90-zen;
+  let denom = Math.cos(lat)*Math.sin(zen*RAD);
+  if(Math.abs(denom)<1e-9) denom = 1e-9;
+  let ca = (Math.sin(dr)-Math.sin(lat)*cz)/denom;
+  ca = Math.max(-1,Math.min(1,ca));
+  let azN = Math.acos(ca)/RAD;
+  if(ha > 0) azN = 360-azN;
+  let az = azN-180;
+  if(az > 180) az -= 360;
+  if(az < -180) az += 360;
+  return {alt, az};
+}
+
+const fmt = (n, d = 0) => n.toLocaleString('en-GB', {
+  minimumFractionDigits: d, maximumFractionDigits: d });
+
+/* ---- colour ---------------------------------------------------------- */
+function ramp(t){
+  // Same four stops as the study's legend gradient.
+  const stops = [[0,[46,35,88]],[.38,[138,74,34]],[.72,[201,130,42]],[1,[242,227,184]]];
+  t = Math.max(0, Math.min(1, t));
+  for(let i=0;i<stops.length-1;i++){
+    const [a,ca]=stops[i], [b,cb]=stops[i+1];
+    if(t>=a && t<=b){
+      const u=(t-a)/(b-a||1);
+      return `rgb(${Math.round(ca[0]+(cb[0]-ca[0])*u)},${Math.round(ca[1]+(cb[1]-ca[1])*u)},${Math.round(ca[2]+(cb[2]-ca[2])*u)})`;
+    }
+  }
+  return 'rgb(242,227,184)';
+}
+
+/* ---- derive scales from the data, not from a guess -------------------- */
+const withPanels = CITY.buildings.filter(b => b.n > 0);
+const perPanel   = withPanels.map(b => b.k / b.n).sort((a,b)=>a-b);
+const q = (arr,p) => arr.length ? arr[Math.floor((arr.length-1)*p)] : 0;
+const YLO = q(perPanel,.05), YHI = q(perPanel,.95);
+const perDw  = withPanels.map(b => (b.n*CITY.meta.panel_wp/1000)/Math.max(b.d,1)).sort((a,b)=>a-b);
+const DLO = q(perDw,.05), DHI = q(perDw,.95);
+
+let MODE = 'yield';
+let selectedBuilding = null;
+let selectedPanels = null;
+let selectionSeq = 0;
+function colourFor(b){
+  if(!b.n) return '#6b7280';
+  if(MODE === 'yield')   return ramp((b.k/b.n - YLO)/((YHI-YLO)||1));
+  if(MODE === 'density'){
+    const v = (b.n*CITY.meta.panel_wp/1000)/Math.max(b.d,1);
+    return ramp((v - DLO)/((DHI-DLO)||1));
+  }
+  return b.s === 0 ? '#D45438' : (b.s === 1 ? '#C9822A' : '#5FA98B');
+}
+
+/* ---- GeoJSON for the building layer ---------------------------------- */
+function buildingsGeoJSON(){
+  return {type:'FeatureCollection', features: CITY.buildings.map(b => ({
+    type:'Feature',
+    id: b.i >>> 0,
+    properties:{
+      i:b.i, colour:colourFor(b), n:b.n, k:b.k, d:b.d, a:b.a,
+    h:b.h, lv:b.lv, s:b.s, u:b.u, cx:b.g.reduce((s,p)=>s+p[1],0)/b.g.length,
+    cy:b.g.reduce((s,p)=>s+p[0],0)/b.g.length, modelled: b.n>0 ? 1 : 0
+    },
+    geometry:{type:'Polygon', coordinates:[ b.g.map(p => [p[1], p[0]]) ]}
+  }))};
+}
+
+function shadowGeoJSON(){
+  const sun = sunPosition(shadowDoy, shadowMinutes/60);
+  if(sun.alt <= 0.5) return {type:'FeatureCollection', features:[]};
+  const distancePerMetre = Math.min(600, 1/Math.tan(sun.alt*RAD));
+  const ux = Math.sin(sun.az*RAD)*distancePerMetre;
+  const uy = Math.cos(sun.az*RAD)*distancePerMetre;
+  const features = [];
+  for(const b of CITY.buildings){
+    const cosLat = Math.cos(((b.g[0] || [40.43])[0])*RAD);
+    const dx = ux*b.h/(111320*cosLat), dy = uy*b.h/111320;
+    const ring = b.g.map(p => [p[1],p[0]]);
+    const cap = b.g.map(p => [p[1]+dx,p[0]+dy]);
+    const quads = [];
+    for(let i=0;i<ring.length;i++){
+      const j=(i+1)%ring.length;
+      quads.push([ring[i],ring[j],cap[j],cap[i],ring[i]]);
+    }
+    quads.push([...cap,cap[0]]);
+    features.push({type:'Feature',properties:{shadow:1},
+      geometry:{type:'MultiPolygon',coordinates:quads.map(q=>[q])}});
+  }
+  return {type:'FeatureCollection',features};
+}
+
+function updateShadows(){
+  const src = map.getSource('shadows');
+  if(src) src.setData(shadowGeoJSON());
+  const sun = sunPosition(shadowDoy, shadowMinutes/60);
+  const md = monthDay(shadowDoy);
+  const hh = String(Math.floor(shadowMinutes/60)).padStart(2,'0');
+  const mm = String(shadowMinutes%60).padStart(2,'0');
+  document.getElementById('dayOut').textContent = `${md[1]} ${MON[md[0]-1]}`;
+  document.getElementById('hourOut').textContent = `${hh}:${mm}`;
+  document.getElementById('subhead').dataset.sun =
+    `${sun.alt.toFixed(1)}° altitude · ${sun.az.toFixed(0)}° from south`;
+  if(selectedBuilding) renderBuildingEconomics();
+}
+
+/* ---- basemap: raster OSM, recoloured in CSS --------------------------- */
+const style = {
+  version:8,
+  sources:{
+    osm:{
+      type:'raster',
+      tiles:['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+             'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+             'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'],
+      tileSize:256, maxzoom:19,
+      attribution:'© OpenStreetMap contributors'
+    }
+  },
+  layers:[
+    {id:'bg', type:'background', paint:{'background-color':'#CFC7B6'}},
+    {id:'osm', type:'raster', source:'osm', paint:{'raster-opacity':1}}
+  ]
+};
+
+const bb = CITY.meta.bbox;   // [minLat, minLon, maxLat, maxLon]
+const map = new maplibregl.Map({
+  container:'map', style,
+  bounds:[[bb[1],bb[0]],[bb[3],bb[2]]],
+  fitBoundsOptions:{padding:28},
+  maxZoom:20, minZoom:9, attributionControl:{compact:true}
+});
+map.addControl(new maplibregl.NavigationControl({showCompass:false}), 'top-right');
+map.addControl(new maplibregl.ScaleControl({maxWidth:110, unit:'metric'}));
+
+/* Recolour the raster tiles without a second style: MapLibre paints into a
+   single canvas, so a CSS filter on that canvas would also dim our own
+   polygons. Instead the basemap sits in its own map pane underneath. */
+map.on('load', () => {
+  const canvas = map.getCanvas();
+  canvas.parentElement.style.filter = 'none';
+
+  map.addSource('shadows', {type:'geojson', data:shadowGeoJSON()});
+  map.addLayer({
+    id:'shadows', type:'fill', source:'shadows',
+    paint:{'fill-color':'#25221D','fill-opacity':0.52}
+  });
+  map.addSource('bld', {type:'geojson', data:buildingsGeoJSON()});
+
+  map.addLayer({
+    id:'bld-fill', type:'fill', source:'bld',
+    paint:{
+      'fill-color':['get','colour'],
+      'fill-opacity':[
+        'interpolate',['linear'],['zoom'],
+        11,['case',['==',['get','modelled'],1],0.92,0.34],
+        16,['case',['==',['get','modelled'],1],0.80,0.24],
+        17.4,['case',['==',['get','modelled'],1],0.26,0.16]
+      ]
+    }
+  });
+  map.addLayer({
+    id:'bld-line', type:'line', source:'bld',
+    paint:{
+      'line-color':['case',['==',['get','modelled'],1],'#000','#4b5563'],
+      'line-opacity':['interpolate',['linear'],['zoom'],13,0,15,0.30,17,0.5],
+      'line-width':['interpolate',['linear'],['zoom'],15,0.4,18,1.0]
+    }
+  });
+  map.addLayer({
+    id:'bld-sel', type:'line', source:'bld',
+    filter:['==',['get','i'],-1],
+    paint:{'line-color':'#F2E3B8','line-width':2.2}
+  });
+
+  // Panels: one source, refilled from the tiles in view.
+  map.addSource('pan', {type:'geojson', data:{type:'FeatureCollection',features:[]}});
+  map.addLayer({
+    id:'pan-fill', type:'circle', source:'pan',
+    paint:{
+      'circle-color':['get','c'],
+      'circle-radius':['interpolate',['linear'],['zoom'],16,0.7,18,2.2,20,5.5],
+      'circle-opacity':0.95,
+      'circle-stroke-width':['interpolate',['linear'],['zoom'],18,0,20,0.4],
+      'circle-stroke-color':'rgba(0,0,0,.5)'
+    },
+    layout:{visibility:'none'}
+  });
+
+  wireInteraction();
+  refreshPanels();
+  paintMeta();
+  updateShadows();
+});
+
+/* ---- panel tiles ------------------------------------------------------ */
+const tileCache = new Map();     // key -> array of {i, p:[[lat,lon,kwh,svf]]}
+const inflight  = new Set();
+let panelSeq = 0;
+
+function tilesInView(){
+  const b = map.getBounds();
+  const out = [];
+  const y0 = Math.floor(b.getSouth()/TILE_DEG), y1 = Math.floor(b.getNorth()/TILE_DEG);
+  const x0 = Math.floor(b.getWest()/TILE_DEG),  x1 = Math.floor(b.getEast()/TILE_DEG);
+  // A hard cap keeps a fast zoom-out from queueing hundreds of fetches.
+  if((y1-y0+1)*(x1-x0+1) > 64) return out;
+  for(let y=y0;y<=y1;y++) for(let x=x0;x<=x1;x++) out.push(`${y}_${x}`);
+  return out;
+}
+
+async function refreshPanels(){
+  const show = map.getZoom() >= PANEL_ZOOM;
+  const hint = document.getElementById('zoomhint');
+  if(map.getLayer('pan-fill'))
+    map.setLayoutProperty('pan-fill','visibility', show ? 'visible' : 'none');
+  hint.style.opacity = show ? 0 : 1;
+  if(!show) return;
+
+  const keys = tilesInView();
+  const seq = ++panelSeq;
+  await Promise.all(keys.map(async k => {
+    if(tileCache.has(k) || inflight.has(k)) return;
+    inflight.add(k);
+    try{
+      const r = await fetch(`${TILE_BASE}${k}.json`);
+      tileCache.set(k, r.ok ? await r.json() : []);
+    }catch(e){ tileCache.set(k, []); }
+    finally{ inflight.delete(k); }
+  }));
+  if(seq !== panelSeq) return;     // a newer pan already superseded this one
+
+  const feats = [];
+  for(const k of keys){
+    for(const b of (tileCache.get(k) || [])){
+      for(const p of b.p){
+        feats.push({type:'Feature',
+          properties:{c: ramp((p[2]-YLO)/((YHI-YLO)||1)), kwh:p[2], svf:p[3], i:b.i},
+          geometry:{type:'Point', coordinates:[p[1], p[0]]}});
+      }
+    }
+  }
+  const src = map.getSource('pan');
+  if(src) src.setData({type:'FeatureCollection', features:feats});
+}
+
+/* ---- interaction ------------------------------------------------------ */
+function wireInteraction(){
+  let moveTimer;
+  const queue = () => { clearTimeout(moveTimer); moveTimer = setTimeout(refreshPanels, 90); };
+  map.on('moveend', queue);
+  map.on('zoomend', queue);
+  // idle also covers programmatic moves (deep links, jumpTo), which do not
+  // always emit moveend.
+  map.on('idle', () => { if(map.getZoom() >= PANEL_ZOOM) refreshPanels(); });
+
+  map.on('click','bld-fill', e => selectBuilding(e.features[0].properties));
+  map.on('mouseenter','bld-fill', () => map.getCanvas().style.cursor='pointer');
+  map.on('mouseleave','bld-fill', () => map.getCanvas().style.cursor='');
+
+  document.getElementById('modeSeg').addEventListener('click', ev => {
+    const btn = ev.target.closest('button'); if(!btn) return;
+    MODE = btn.dataset.mode;
+    [...ev.currentTarget.querySelectorAll('button')].forEach(b =>
+      b.setAttribute('aria-pressed', String(b === btn)));
+    map.getSource('bld').setData(buildingsGeoJSON());
+    paintLegend();
+  });
+  document.getElementById('day').addEventListener('input', ev => {
+    shadowDoy = Number(ev.target.value); updateShadows();
+  });
+  document.getElementById('hour').addEventListener('input', ev => {
+    shadowMinutes = Number(ev.target.value); updateShadows();
+  });
+
+  document.getElementById('themeBtn').addEventListener('click', () => {
+    const root = document.documentElement;
+    const now = root.getAttribute('data-theme');
+    const next = now === 'dark' ? 'light' : (now === 'light' ? null : 'dark');
+    if(next) root.setAttribute('data-theme', next); else root.removeAttribute('data-theme');
+    try{ localStorage.setItem('madrid-city-theme', next || 'system'); }catch(e){}
+    applyBasemapFilter();
+  });
+  try{
+    const saved = localStorage.getItem('madrid-city-theme');
+    if(saved && saved !== 'system') document.documentElement.setAttribute('data-theme', saved);
+  }catch(e){}
+  applyBasemapFilter();
+}
+
+function applyBasemapFilter(){
+  // The raster layer is dimmed through MapLibre's own paint properties so
+  // the model's polygons keep their true colour.
+  if(!map.getLayer('osm')) return;
+  const root = document.documentElement;
+  const attr = root.getAttribute('data-theme');
+  const light = attr !== 'dark';
+  map.setPaintProperty('osm','raster-opacity', light ? 0.68 : 0.40);
+  map.setPaintProperty('osm','raster-saturation', light ? -0.55 : -0.75);
+  map.setPaintProperty('osm','raster-brightness-min', light ? 0.55 : 0.02);
+  map.setPaintProperty('osm','raster-brightness-max', light ? 1.0 : 0.42);
+  map.setPaintProperty('osm','raster-contrast', light ? -0.04 : -0.12);
+  map.setPaintProperty('bg','background-color',
+    light ? '#CFC7B6' : '#0A0D13');
+}
+
+function selectBuilding(p){
+  map.setFilter('bld-sel', ['==',['get','i'], p.i]);
+  const hint = document.getElementById('selHint');
+  const body = document.getElementById('selBody');
+  const kwp = p.n * CITY.meta.panel_wp / 1000;
+  const src = ['inferred from typology','OSM floor count','OSM height'][p.s] || '—';
+  const use = ['residential','office','other'][p.u] || 'other';
+
+  if(!p.n){
+    selectedBuilding = null;
+    selectedPanels = null;
+    hint.hidden = false;
+    hint.innerHTML = `<b style="color:var(--text)">Outside the model.</b><br>` +
+      `${use}, ${fmt(p.a)} m² footprint, ${p.lv} floors. ` +
+      `It is still simulated as an obstruction — it shades its neighbours.`;
+    body.hidden = true;
+    document.getElementById('econBody').innerHTML = 'No modelled roof selected.';
+    return;
+  }
+  selectedBuilding = p;
+  selectedPanels = null;
+  hint.hidden = true; body.hidden = false;
+  body.innerHTML =
+    `<div class="kv"><span>panels</span><b>${fmt(p.n)}</b></div>` +
+    `<div class="kv"><span>capacity</span><b>${fmt(kwp,1)} kWp</b></div>` +
+    `<div class="kv"><span>generation</span><b>${fmt(p.k)} kWh/yr</b></div>` +
+    `<div class="kv"><span>per panel</span><b>${fmt(p.k/p.n)} kWh</b></div>` +
+    `<div class="kv"><span>dwellings (est.)</span><b>${fmt(p.d)}</b></div>` +
+    `<div class="kv"><span>kWp per dwelling</span><b>${fmt(kwp/Math.max(p.d,1),2)}</b></div>` +
+    `<div class="kv"><span>footprint</span><b>${fmt(p.a)} m²</b></div>` +
+    `<div class="kv"><span>height</span><b>${fmt(p.h,1)} m · ${p.lv} fl</b></div>` +
+    `<div class="kv"><span>height source</span><b>${src}</b></div>`;
+  document.getElementById('econBody').innerHTML = 'Loading panel positions for the live shadow calculation…';
+  loadSelectedPanels(p);
+}
+
+function pointInRing(x, y, ring){
+  let inside = false;
+  for(let i=0, j=ring.length-1; i<ring.length; j=i++){
+    const xi=ring[i][0], yi=ring[i][1], xj=ring[j][0], yj=ring[j][1];
+    const hit = ((yi>y)!==(yj>y)) &&
+      x < (xj-xi)*(y-yi)/(yj-yi || 1e-12)+xi;
+    if(hit) inside = !inside;
+  }
+  return inside;
+}
+
+function panelIsShadowed(lat, lon, sun){
+  if(sun.alt <= 0.5) return true;
+  const distancePerMetre = Math.min(600, 1/Math.tan(sun.alt*RAD));
+  const ux = Math.sin(sun.az*RAD)*distancePerMetre;
+  const uy = Math.cos(sun.az*RAD)*distancePerMetre;
+  const cosLat = Math.cos(lat*RAD);
+  const maxDeg = 600/111320;
+  for(const b of CITY.buildings){
+    if(selectedBuilding && String(b.i)===String(selectedBuilding.i)) continue;
+    if(!b.h || !b.g || !b.g.length) continue;
+    // A same-height or shorter neighbour cannot cast onto this roof plane.
+    if(selectedBuilding && b.h <= selectedBuilding.h + 0.5) continue;
+    const bLat = b.g.reduce((s,p)=>s+p[0],0)/b.g.length;
+    const bLon = b.g.reduce((s,p)=>s+p[1],0)/b.g.length;
+    if(Math.abs(bLat-lat)>maxDeg || Math.abs(bLon-lon)>maxDeg/Math.max(cosLat,0.1)) continue;
+    const dx = ux*b.h/(111320*cosLat), dy = uy*b.h/111320;
+    const ring = b.g.map(p=>[p[1],p[0]]);
+    const cap = b.g.map(p=>[p[1]+dx,p[0]+dy]);
+    for(let i=0;i<ring.length;i++){
+      const j=(i+1)%ring.length;
+      if(pointInRing(lon,lat,[ring[i],ring[j],cap[j],cap[i]])) return true;
+    }
+    if(pointInRing(lon,lat,cap)) return true;
+  }
+  return false;
+}
+
+async function loadSelectedPanels(p){
+  const seq = ++selectionSeq;
+  const key = `${Math.floor(p.cy/TILE_DEG)}_${Math.floor(p.cx/TILE_DEG)}`;
+  if(!tileCache.has(key)){
+    try{
+      const r = await fetch(`${TILE_BASE}${key}.json`);
+      tileCache.set(key, r.ok ? await r.json() : []);
+    }catch(e){ tileCache.set(key, []); }
+  }
+  if(seq !== selectionSeq) return;
+  const match = (tileCache.get(key)||[]).find(b=>String(b.i)===String(p.i));
+  selectedPanels = match ? match.p : [];
+  renderBuildingEconomics();
+}
+
+function renderBuildingEconomics(){
+  const out = document.getElementById('econBody');
+  if(!selectedBuilding || !selectedPanels){
+    out.innerHTML = 'Loading panel positions for the live shadow calculation…';
+    return;
+  }
+  const sun = sunPosition(shadowDoy, shadowMinutes/60);
+  const active = selectedPanels.filter(p=>!panelIsShadowed(p[0],p[1],sun));
+  const activeRatio = selectedPanels.length ? active.length/selectedPanels.length : 0;
+  // A 15-minute clear-sky proxy scales each panel's annual modelled yield.
+  const intervalKwh = active.reduce((sum,p)=>sum + p[2],0) *
+    Math.max(0,Math.sin(sun.alt*RAD))/10000;
+  const selfConsumed = intervalKwh * 0.70;
+  const exported = intervalKwh - selfConsumed;
+  const value = selfConsumed*0.133 + exported*0.05;
+  const annualValue = selectedBuilding.k * (0.70*0.133 + 0.30*0.05);
+  const installedCost = selectedBuilding.n * CITY.meta.panel_wp * 0.64;
+  const payback = annualValue > 0 ? installedCost/annualValue : 0;
+  out.innerHTML =
+    `<div class="kv"><span>installed panels</span><b>${fmt(selectedBuilding.n)}</b></div>` +
+    `<div class="kv"><span>producing now</span><b>${fmt(active.length)} (${fmt(activeRatio*100,0)}%)</b></div>` +
+    `<div class="kv"><span>output this 15 min</span><b>${fmt(intervalKwh,2)} kWh</b></div>` +
+    `<div class="kv"><span>self-consumed / exported</span><b>${fmt(selfConsumed,2)} / ${fmt(exported,2)} kWh</b></div>` +
+    `<div class="kv"><span>value this 15 min</span><b>€${fmt(value,2)}</b></div>` +
+    `<div class="kv"><span>estimated annual value</span><b>€${fmt(annualValue,0)}/yr</b></div>` +
+    `<div class="kv"><span>collective payback</span><b>${fmt(payback,1)} yr</b></div>` +
+    `<p class="muted" style="margin:8px 0 0">At ${document.getElementById('dayOut').textContent}, ${document.getElementById('hourOut').textContent}: ${fmt(selectedBuilding.n-active.length)} panels are in the projected shadow. Live value uses €0.133/kWh self-consumed and €0.05/kWh exported. Annual value applies the same 70/30 split to this building's modelled annual generation; it is gross energy value before maintenance, tax and financing.</p>`;
+}
+
+/* ---- chrome ----------------------------------------------------------- */
+function paintLegend(){
+  const t = document.getElementById('legendTitle');
+  const lo = document.getElementById('rampLo'), hi = document.getElementById('rampHi');
+  const ramps = document.querySelector('.ramp');
+  if(MODE === 'yield'){
+    t.textContent = 'annual yield per panel';
+    lo.textContent = fmt(YLO); hi.textContent = fmt(YHI);
+    ramps.style.display=''; lo.parentElement.style.display='';
+  }else if(MODE === 'density'){
+    t.textContent = 'kWp per dwelling';
+    lo.textContent = fmt(DLO,2); hi.textContent = fmt(DHI,2);
+    ramps.style.display=''; lo.parentElement.style.display='';
+  }else{
+    t.textContent = 'height provenance';
+    ramps.style.display='none';
+    lo.parentElement.innerHTML =
+      '<span class="swatch" style="background:#D45438"></span>inferred &nbsp;' +
+      '<span class="swatch" style="background:#5FA98B"></span>measured';
+  }
+}
+
+function paintMeta(){
+  const m = CITY.meta;
+  const dwell = CITY.buildings.filter(b=>b.n>0).reduce((s,b)=>s+b.d,0);
+  const kwp = m.panels * m.panel_wp / 1000;
+  document.getElementById('subhead').textContent =
+    `${fmt(m.buildings)} buildings from OpenStreetMap · ${fmt(m.simulated)} roofs modelled · generated ${m.generated}`;
+  document.getElementById('rdPanels').textContent = fmt(m.panels);
+  document.getElementById('rdMwp').textContent = fmt(kwp/1000,1);
+  document.getElementById('rdGwh').textContent = fmt(m.kwh/1e6,1);
+  document.getElementById('mBuildings').textContent = fmt(m.buildings);
+  document.getElementById('mSimulated').textContent = fmt(m.simulated);
+  document.getElementById('mPanels').textContent = fmt(m.panels);
+  document.getElementById('mKwp').textContent = fmt(kwp/1000,1) + ' MWp';
+  document.getElementById('mGwh').textContent = fmt(m.kwh/1e6,1) + ' GWh/yr';
+  document.getElementById('mDwell').textContent = fmt(dwell);
+  document.getElementById('mPerDwell').textContent = fmt(kwp/Math.max(dwell,1),2);
+  document.getElementById('mSim').textContent =
+    m.sim_seconds >= 60 ? fmt(m.sim_seconds/60,1)+' min' : m.sim_seconds+' s';
+  paintLegend();
+}
+
+// Keep the headline figures visible even if the optional basemap is slow.
+paintMeta();
+</script>
+</body>
+</html>

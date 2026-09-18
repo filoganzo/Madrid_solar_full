@@ -1,0 +1,82 @@
+
+============================================================================
+1 · THE EXTRACT
+============================================================================
+  buildings drawn                    33,179
+  roofs modelled                     19,648
+  panels                             455,050
+  capacity                           204.8 MWp
+  generation                         339.9 GWh/yr
+  simulation time                    12.2 min on 620 panels/s
+
+  Every building in the extract shades, whether or not it carries
+  panels. That is why the unmodelled ones are still loaded.
+
+============================================================================
+2 · ROOF PER DWELLING — the headline result, now measured
+============================================================================
+  dwellings under a modelled roof    285,499
+  capacity over those dwellings      204,772 kWp
+  ROOF PER DWELLING, aggregate       0.72 kWp   (1,207 kWh/yr)
+
+  the single Ensanche block said     0.97 kWp
+  difference                         -26%
+
+  Distribution across buildings, which the block could not show:
+     5th percentile                 0.13 kWp/dwelling
+    25th percentile                 0.34 kWp/dwelling
+    50th percentile                 0.52 kWp/dwelling
+    75th percentile                 0.78 kWp/dwelling
+    95th percentile                 1.35 kWp/dwelling
+
+  buildings under 1 kWp/dwelling     89%
+  A single block cannot produce a distribution, and the spread here
+  is the point: the mean is not the building you are selling to.
+
+============================================================================
+3 · YIELD — does the block's number survive the city?
+============================================================================
+  per-panel yield, median            757 kWh/yr
+  5th / 95th percentile              655 / 758 kWh/yr
+  specific yield                     1,660 kWh/kWp
+  PVGIS unshaded at 37 deg           1,800 kWh/kWp
+  cost of the city, in yield         -8%
+
+  Read that against finding 7 of the block study: most of this gap is
+  the deliberate 15 deg tilt, not the neighbours. The city run does
+  not overturn that; it widens the sample it rests on.
+
+============================================================================
+4 · PROVENANCE — how much of this is measured
+============================================================================
+  inferred from typology              22,067  (66.5%)
+  OSM floor count                     10,907  (32.9%)
+  OSM height                             205  ( 0.6%)
+
+  measured, not inferred             33.5%
+  This is the same weakness the block study named, at city scale and
+  therefore harder to wave away. It is third on the list to fix, not
+  first, for the reason attribute_shading.py established: urban
+  obstruction is worth ~2% of yield in a city built to a cornice line.
+
+============================================================================
+5 · WHAT THIS CHANGES
+============================================================================
+  Section 11 of the block study extrapolates one block to Madrid and
+  flags the ratio it uses as the most sensitive input in the section.
+  This run replaces that assumption with a measurement over 19,648
+  roofs, and the ratio moves:
+
+    block-derived      0.97 kWp/dwelling  ->  1.11 GW
+    city-measured      0.72 kWp/dwelling  ->  0.82 GW
+
+  The honest caveat, stated as plainly as the number: this extract is
+  still central Madrid, so it is a wider sample of the same kind of
+  city rather than a survey of every typology in it. Vallecas and the
+  post-war periphery have sloped, lower, differently-owned roofs, and
+  they are still under-represented here.
+
+  What does not move is the constraint. A larger roof per dwelling
+  changes the size of the prize; it does not change who has to sign.
+  The binding input is still a junta de propietarios vote, and the
+  deployment rate is still set by the sales cycle rather than the sun.

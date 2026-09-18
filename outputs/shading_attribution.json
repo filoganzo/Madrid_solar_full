@@ -1,0 +1,16 @@
+{
+ "A_open_37deg": 799.3467549785539,
+ "B_open_15deg": 762.0156040803677,
+ "C_neighbours": 748.0365457060402,
+ "D_parapet": 747.7721968285629,
+ "E_rows": 744.7490565004382,
+ "gap_total_pct": 6.830289625630686,
+ "urban_obstruction_pct": 2.2659047252408246,
+ "share_tilt": 0.6837495341154283,
+ "share_neighbours": 0.25603750275170756,
+ "share_parapet": 0.004841758624373229,
+ "share_rows": 0.055371204508490916,
+ "n_sample": 250,
+ "n_population": 5538,
+ "seed": 42
+}

@@ -1,0 +1,7 @@
+# Deliberately minimal. numpy and PyYAML do the work; pytest runs the checks.
+# No pvlib, no geopandas, no shapely: the solar geometry, the transposition
+# and the polygon operations are all implemented here so they can be checked
+# line by line rather than trusted.
+numpy>=1.24
+PyYAML>=6.0
+pytest>=7.0

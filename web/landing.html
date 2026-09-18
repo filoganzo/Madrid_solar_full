@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Madrid rooftop solar — from first principles</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0E1116; --surface:#161B23; --surface-2:#1C2230;
+  --hairline:#263041; --hairline-2:#333F55;
+  --text:#E4E8F0; --text-2:#9AA4B8; --text-3:#66708A;
+  --sun-1:#8A4A22; --sun-2:#C9822A; --sun-3:#F2E3B8; --good:#5FA98B;
+}
+@media (prefers-color-scheme: light){
+  :root{
+    --ink:#EFEAE0; --surface:#F7F4ED; --surface-2:#FFFFFF;
+    --hairline:#D4CCBC; --hairline-2:#B9AF9B;
+    --text:#1A1712; --text-2:#5C554A; --text-3:#8A8275;
+    --sun-1:#C07A2E; --sun-2:#E0A33E; --sun-3:#7A5A10; --good:#37725B;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--ink); color:var(--text);
+  font-family:'Archivo',system-ui,-apple-system,'Segoe UI',sans-serif;
+  font-size:16px; line-height:1.6; font-variant-numeric:tabular-nums;
+  -webkit-font-smoothing:antialiased;
+  padding:0 20px calc(60px + env(safe-area-inset-bottom,0px));
+}
+.wrap{max-width:820px; margin:0 auto}
+header{padding:calc(52px + env(safe-area-inset-top,0px)) 0 30px;
+  border-bottom:1px solid var(--hairline)}
+h1{margin:0 0 10px; font-size:clamp(26px,5vw,38px); line-height:1.15;
+  letter-spacing:-.02em; font-weight:700}
+.lede{margin:0; color:var(--text-2); font-size:clamp(15px,2.4vw,18px); max-width:58ch}
+h2{margin:40px 0 12px; font-size:13px; font-weight:600; color:var(--text-2);
+  text-transform:uppercase; letter-spacing:.08em}
+p{margin:0 0 14px; color:var(--text-2); max-width:70ch}
+strong{color:var(--text); font-weight:600}
+a{color:var(--sun-2)}
+
+.cards{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:22px 0 8px}
+@media (max-width:720px){.cards{grid-template-columns:1fr}}
+.card{
+  display:block; text-decoration:none; color:inherit;
+  border:1px solid var(--hairline); border-radius:3px; padding:18px 18px 16px;
+  background:var(--surface); transition:border-color .16s, transform .16s;
+}
+.card:hover{border-color:var(--sun-2); transform:translateY(-2px)}
+.card h3{margin:0 0 6px; font-size:17px; font-weight:600; color:var(--text)}
+.card p{margin:0; font-size:13.5px; color:var(--text-3)}
+.card .tag{display:inline-block; margin-bottom:9px; font-size:11px;
+  letter-spacing:.06em; text-transform:uppercase; color:var(--sun-2)}
+
+.findings{list-style:none; padding:0; margin:14px 0 0}
+.findings li{
+  padding:11px 0 11px 0; border-bottom:1px solid var(--hairline);
+  color:var(--text-2); font-size:14.5px; max-width:70ch;
+}
+.findings li:last-child{border-bottom:none}
+.findings b{color:var(--text); font-weight:600}
+.note{
+  border-left:2px solid var(--sun-1); padding:2px 0 2px 14px; margin:20px 0;
+  color:var(--text-3); font-size:14px; max-width:68ch;
+}
+code{
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:13px;
+  background:var(--surface-2); border:1px solid var(--hairline);
+  border-radius:2px; padding:1px 5px;
+}
+footer{margin-top:44px; padding-top:20px; border-top:1px solid var(--hairline);
+  color:var(--text-3); font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Madrid rooftop solar, from first principles</h1>
+  <p class="lede">
+    A working model of what rooftop photovoltaics is worth in Madrid, built
+    from the sun's position upward rather than from a kWh/kWp lookup downward.
+    Written as a case study, not a proposal.
+  </p>
+</header>
+
+<h2>The two maps</h2>
+<div class="cards">
+  <a class="card" href="city/index.html">
+    <span class="tag">the city</span>
+    <h3>Central Madrid</h3>
+    <p>
+      Every building in the extract, on real streets. Roofs coloured by
+      modelled yield; zoom in far enough and each dot is one panel with its
+      own number. Grey roofs are outside the model but still cast shadows.
+    </p>
+  </a>
+  <a class="card" href="index.html">
+    <span class="tag">one block</span>
+    <h3>The Ensanche block</h3>
+    <p>
+      Where the model was built and checked: 100 buildings, sun dial, shadow
+      mask, per-panel yield, and the economics that decide whether any of it
+      pays.
+    </p>
+  </a>
+</div>
+
+<h2>What the model does</h2>
+<p>
+  The obvious question is how much rooftop solar Madrid could hold. In Spain
+  that has an uninteresting answer, because the sun is not the constraint.
+  The question worth the work is different: <strong>if you already supply
+  electricity in Britain and you are moving into Spain, does the same rooftop
+  product work, and if not, what breaks first?</strong>
+</p>
+<p>
+  So the physics is implemented rather than looked up — NOAA solar position,
+  Ineichen–Perez clear sky, Erbs diffuse split, Hay–Davies transposition,
+  Faiman cell temperature, and a geometric horizon computed per panel from
+  real building footprints. The unit of analysis is one panel, because the
+  decision is marginal: the last row added to a roof is often the one that
+  loses money.
+</p>
+
+<h2>What it found</h2>
+<ul class="findings">
+  <li><b>Sunshine is not the Spanish constraint — roof per household is.</b>
+      About 0.97 kWp per dwelling where a British semi has roughly 4 kWp. Six
+      floors share one roof.</li>
+  <li><b>A Spanish kilowatt-hour avoided is worth about half a British one.</b>
+      €0.133/kWh demand-weighted against 26.11 p. More sun, a fifth of the
+      revenue.</li>
+  <li><b>The product is not a panel. It is a signed resolution from a
+      comunidad de propietarios.</b> One flat alone pays €4.16/Wp and never
+      pays back; the whole building together pays €0.64/Wp and returns in
+      4.3 years. Same hardware, same sun. The difference is who signed.</li>
+  <li><b>Urban shading costs 2.3%, not the 20% that dense-city intuition
+      suggests</b> — and that finding demolished my own top data request,
+      which is the most useful thing the model did.</li>
+  <li><b>A domestic battery is a poor household investment and a good trading
+      asset</b>, which is an argument for vertical integration made in
+      arithmetic rather than in slogans.</li>
+</ul>
+
+<div class="note">
+  The write-up includes a section called “Where I was wrong”, listing five
+  bugs that changed the answer and one claim I had to withdraw, each now
+  covered by a regression test. They are in the repository because the
+  corrections are the most informative part of the build.
+</div>
+
+<h2>Running it</h2>
+<p>
+  Everything is reproducible from the repository: <code>python
+  run_madrid.py</code> for the block study, <code>python run_city.py</code>
+  for the city. Every input lives in one config file with a source and a
+  confidence label, and the test suite checks the physics against arithmetic
+  that cannot be wrong — equinox noon altitude must equal 90 − latitude.
+</p>
+
+<footer>
+  Building geometry © OpenStreetMap contributors, ODbL. Irradiance reference
+  data from EU PVGIS; temperature normals from AEMET. Every number here is
+  illustrative and should be read as a range.
+</footer>
+
+</div>
+</body>
+</html>

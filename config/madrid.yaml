@@ -1,0 +1,231 @@
+# =============================================================================
+#  madrid.yaml — every number the model uses, in one place.
+#
+#  Rules for this file:
+#    1. Nothing is hard-coded anywhere else in the repo. If a number matters,
+#       it lives here.
+#    2. Every entry carries `src` (where it came from) and `conf`
+#       (high / med / low — how much I would bet on it).
+#    3. `sensitive: true` marks the inputs the answer actually moves on.
+#       Those are the ones worth arguing about; the rest are bookkeeping.
+#
+#  Anything marked conf: low is a placeholder for a number I would go and
+#  get from a named source before spending money. Those are listed in
+#  README.md under "Data I would buy first".
+# =============================================================================
+
+site:
+  name: "Madrid — Ensanche block, Salamanca / Castellana"
+  lat: 40.4313          # deg N   src: OSM extract centroid              conf: high
+  lon: -3.6883          # deg E (negative = W)
+  elevation_m: 660      # src: Madrid municipal average                  conf: high
+  utc_offset_winter: 1  # CET
+  utc_offset_summer: 2  # CEST — EU DST, last Sun Mar -> last Sun Oct
+  albedo: 0.20          # urban mixed surfaces  src: standard            conf: med
+  linke_turbidity:      # monthly, dimensionless. Madrid is dusty in summer
+    # src: SoDa/Linke climatology for central Iberia, rounded.  conf: med
+    # sensitive: drives clear-sky DNI/DHI split, calibrated out below.
+    - 2.7   # Jan
+    - 2.9   # Feb
+    - 3.1   # Mar
+    - 3.3   # Apr
+    - 3.4   # May
+    - 3.5   # Jun
+    - 3.6   # Jul  <- calima season
+    - 3.5   # Aug
+    - 3.3   # Sep
+    - 3.0   # Oct
+    - 2.8   # Nov
+    - 2.6   # Dec
+
+# -----------------------------------------------------------------------------
+# Calibration target. The model is built from first principles, which means it
+# is wrong until proven otherwise. PVGIS is the referee.
+# -----------------------------------------------------------------------------
+calibration:
+  # src: EU PVGIS v5.3 @ 40.42N, 3.70W — optimum 37 deg tilt, -6 deg azimuth,
+  #      2093 kWh/m2/yr in plane, 14% system loss.   conf: high
+  pvgis_poa_optimal_kwh_m2: 2093
+  pvgis_optimal_tilt_deg: 37
+  pvgis_optimal_azimuth_deg: -6     # 0 = due south, negative = east of south
+  pvgis_system_loss_pct: 14
+  pvgis_specific_yield_kwh_kwp: 1800  # = 2093 * 0.86, rounded
+  tolerance_pct: 4                    # fail the build if we miss by more
+
+# -----------------------------------------------------------------------------
+# The module. One physical object, costed and modelled as one object.
+# -----------------------------------------------------------------------------
+panel:
+  model: "generic 450 Wp monocrystalline TOPCon, 2026 mainstream"
+  wp: 450                    # src: market standard              conf: high
+  length_m: 1.762
+  width_m: 1.134
+  area_m2: 1.998
+  efficiency_stc: 0.2252     # = 450 / (1.998 * 1000)
+  temp_coeff_pmp: -0.0029    # /degC   src: TOPCon datasheets    conf: high
+  noct_c: 44
+  faiman_u0: 25.0            # W/m2K   src: Faiman (2008)        conf: med
+  faiman_u1: 6.84            # W/m3sK
+  iam_b0: 0.05               # ASHRAE incidence-angle modifier   conf: med
+  degradation_yr1: 0.02      # 2% first-year light-induced       conf: med
+  degradation_annual: 0.0045 # 0.45%/yr thereafter               conf: high
+  life_years: 30
+
+losses:
+  # Applied after irradiance and temperature. Each one is a separate number
+  # because each one has a different owner in an installation business.
+  soiling: 0.025        # Madrid: dry summers + Saharan calima.  conf: med
+                        # sensitive: true — a wash cycle is an opex decision
+  inverter: 0.030       # euro-efficiency 97%                    conf: high
+  dc_wiring: 0.012                                             # conf: high
+  ac_wiring: 0.008                                             # conf: high
+  mismatch: 0.015       # string-level; microinverters would cut this
+  availability: 0.005   # 99.5% uptime                           conf: med
+  # NOTE: shading is NOT in here. Shading is computed geometrically per panel
+  # in src/shading.py. Putting it in a flat loss factor is the single biggest
+  # way these models lie about dense cities.
+
+# -----------------------------------------------------------------------------
+# The roof. Madrid Ensanche typology.
+# -----------------------------------------------------------------------------
+roof:
+  levels_default: 6          # Ensanche residential prior         conf: med
+                             # sensitive: true — drives mutual shading
+  storey_height_m: 3.1       # pre-1970 Madrid residential        conf: med
+  parapet_height_m: 1.0      # antepecho, ubiquitous on flat roofs conf: med
+  flat_roof_share: 0.80      # Ensanche azotea vs sloped tile     conf: low
+  # Usable-area haircut. This is where optimistic studies go wrong.
+  setback_m: 1.5             # fire/maintenance margin from parapet
+  obstruction_share: 0.22    # stairhead, lift overrun, HVAC, water tanks,
+                             # antennas, chimneys, laundry (tendederos)
+                             # src: inspection of aerial imagery   conf: low
+                             # sensitive: true
+  walkway_share: 0.10        # access routes between panel rows
+  tilt_deg: 15               # ballasted flat-roof tilt. Lower than the 37 deg
+                             # optimum on purpose: 37 deg needs ~2.5x the row
+                             # pitch, so it loses more to packing than it
+                             # gains per panel. Tested in run_madrid.py.
+  azimuth_deg: -6            # due south, 6 deg east (PVGIS optimum)
+  row_pitch_factor: 2.2      # row spacing / panel projected height, sized for
+                             # no self-shading at winter-solstice 10:00-14:00
+
+# -----------------------------------------------------------------------------
+# Household demand. The whole economics turns on WHEN, not how much.
+# -----------------------------------------------------------------------------
+demand:
+  annual_kwh: 3000           # src: IDAE/INE Spanish dwelling avg  conf: med
+  base_load_w: 110           # fridge, standby, router
+  # Spanish clock is late. Peak is 21:00-23:00, not 18:00-20:00 as in the UK.
+  # This single fact changes the self-consumption fraction by ~8 pp.
+  evening_peak_hour: 21.5
+  morning_peak_hour: 8.0
+  ac_cooling_kwh: 420        # Jun-Sep, afternoon-weighted          conf: low
+  heating_electric_share: 0.25  # most Madrid flats burn gas       conf: low
+  weekend_uplift: 1.15
+
+battery:
+  usable_kwh: 5.0
+  round_trip_efficiency: 0.90
+  max_charge_kw: 2.5
+  max_discharge_kw: 2.5
+  cycle_life: 6000
+  cost_eur: 2600              # installed, 2026 Spanish retail      conf: med
+                              # sensitive: true
+
+# -----------------------------------------------------------------------------
+# Prices. Spanish retail, 2.0TD three-period tariff, 2026.
+# -----------------------------------------------------------------------------
+tariff:
+  # src: Octopus Solar published 2.0TD rates, Jul 2026. conf: med
+  # All figures EUR/kWh, VAT and electricity tax included.
+  p1_punta_eur_kwh: 0.209    # Mon-Fri 10-14, 18-22
+  p2_llano_eur_kwh: 0.118    # Mon-Fri 8-10, 14-18, 22-24
+  p3_valle_eur_kwh: 0.093    # Mon-Fri 0-8, all weekend/holiday
+  standing_charge_eur_kw_day: 0.1103
+  contracted_kw: 4.6
+
+export:
+  # RD 244/2019 art. 14, "compensacion simplificada".
+  # This is a CREDIT against the energy term of the same billing period.
+  # It is not a sale. It cannot take the energy line below zero. Anything
+  # beyond that is given to the grid for free.
+  compensation_eur_kwh: 0.05   # market range 0.03-0.10             conf: med
+                               # sensitive: true
+  monthly_cap_is_energy_term: true
+  max_installed_kw_for_scheme: 100
+  collective_radius_m: 2000    # RD 244/2019 collective self-consumption
+
+# -----------------------------------------------------------------------------
+# Capex, built from a bill of materials rather than a EUR/Wp headline.
+# The point of building it this way: it separates costs that scale with panel
+# count from costs that do not. That distinction is the whole business model.
+# -----------------------------------------------------------------------------
+capex:
+  # --- per-panel (marginal) ---
+  module_eur_per_panel: 52           # 0.115 EUR/Wp                 conf: med
+  mounting_eur_per_panel: 34         # ballasted flat-roof frame     conf: med
+  dc_string_eur_per_panel: 9
+  labour_eur_per_panel: 88           # 2 installers, ~35 min/panel   conf: med
+  # --- per-installation (fixed, does not care how many panels) ---
+  inverter_eur: 1150                 # 5 kW hybrid                   conf: med
+  protections_meter_eur: 430         # AC board, surge, bidirectional meter
+  roof_access_eur: 850               # scaffold / lift for a 6-storey block
+                                     # sensitive: true — this is the urban tax
+  engineering_cie_eur: 520           # memoria tecnica, boletin, CIE,
+                                     # distributor registration
+  licence_eur: 210                   # municipal licence + ICIO base
+  # --- markup ---
+  installer_margin: 0.25             # on the whole job              conf: med
+  vat: 0.21                          # IVA. Reduced rates have lapsed. conf: med
+
+incentives:
+  # Madrid municipal. Real and worth money, but slow and conditional, so the
+  # base case EXCLUDES them and they are shown as upside.
+  icio_bonus: 0.95          # 95% off the works tax   src: Ayto Madrid conf: high
+  ibi_bonus_rate: 0.50      # 50% off property tax                     conf: high
+  ibi_bonus_years: 3        # sources disagree: 3 or 5 yrs             conf: low
+  ibi_annual_eur: 1105      # on a 250k EUR cadastral value at 0.442%  conf: low
+  irpf_deduction: 0.20      # state income-tax deduction, 20-60%       conf: low
+  include_in_base_case: false
+
+finance:
+  household_discount_rate: 0.06    # real                            conf: low
+  fuse_wacc: 0.09                  # for an asset held on balance sheet conf: low
+  inflation_energy: 0.02           # real electricity price drift     conf: low
+                                   # sensitive: true
+
+# -----------------------------------------------------------------------------
+# City-level sizing. Deliberately coarse; the ranges are the answer.
+# -----------------------------------------------------------------------------
+city:
+  dwellings_main_residence: 1300000  # Madrid municipality  src: INE   conf: med
+  population: 3300000
+  share_in_multifamily_blocks: 0.88  # Spain 65% nationally, cities 73%
+                                     # EU-wide; Madrid city higher.
+                                     # src: Eurostat + INE            conf: low
+                                     # sensitive: true — THE number
+  share_owner_occupied: 0.72
+  comunidad_vote_threshold: 0.333    # 1/3 of owners AND 1/3 of quotas
+                                     # (Ley Propiedad Horizontal 17.1 for
+                                     #  renewable installations)       conf: med
+  junta_cycle_days: 40               # time to get a decision          conf: low
+  balcony_kit_share_of_flats: 0.55   # flats with a usable balcony/terrace
+                                     # facing E-S-W                    conf: low
+                                     # sensitive: true
+
+# -----------------------------------------------------------------------------
+# The plug-in alternative. Modelled because it is the product Fuse has
+# actually said it is launching, and because it routes around the constraint
+# this study identifies.
+# -----------------------------------------------------------------------------
+balcony_kit:
+  panels: 2
+  wp_per_panel: 450
+  inverter_ac_cap_w: 800     # the binding limit, not the panel rating
+  tilt_deg: 90               # vertical railing mount
+  azimuth_deg: 0             # best case: south-facing balcony
+  cost_eur: 620              # retail kit, self-installed     conf: med
+  cost_eur_fuse_bundled: 2000  # Fuse's stated price point incl. battery
+                               # src: Alan Chang, Scaling Europe podcast
+  install_labour_eur: 0        # customer plugs it in
+  regulatory_status: "disputed — see README section 6"

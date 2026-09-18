@@ -1,0 +1,300 @@
+
+============================================================================
+1 · CALIBRATION — check the physics before trusting a euro of it
+============================================================================
+  FITTED ON    monthly GHI, 12 numbers from PVGIS-SARAH2
+    annual GHI, horizontal          1,791 kWh/m2   target 1,791
+    monthly clear-sky index         0.78 (Dec) to 0.98 (Jul)
+    annual diffuse fraction         0.298   Madrid literature 0.30-0.33
+
+  CHECKED AGAINST  two PVGIS numbers the model never saw
+    POA @ 37deg/-6deg               2,087 kWh/m2   PVGIS 2,093   -0.3%
+    specific yield, unshaded        1,776 kWh/kWp   PVGIS 1,800   -1.3%
+    verdict                         PASS within +/-4%
+
+  Sun geometry, the check that needs no external data at all:
+    equinox  21 Mar   noon  49.9deg at 13.33 local   day 12.20 h
+    solstice 21 Jun   noon  73.0deg at 14.25 local   day 15.08 h
+    solstice 21 Dec   noon  26.2deg at 13.25 local   day  9.30 h
+    theory: equinox noon = 90 - 40.43 = 49.57deg. Model gives 49.9. Refraction accounts for the 0.3.
+
+    Solar noon falls near 13:20 in winter and 14:15 in summer, because
+    Madrid sits 15 degrees west of the centre of its own time zone. That is
+    why a south-facing Spanish array peaks inside the afternoon peak tariff
+    band rather than the midday one — worth real money, and easy to miss.
+
+============================================================================
+2 · GEOMETRY — the block as it actually is
+============================================================================
+  extract: 450 x 450 m, Salamanca / Castellana, 40.4313 -3.6883
+  buildings                          100
+  height provenance                  inferred=94, osm:levels=6
+  heights actually measured          6 of 100 (6%)   <- the binding data gap
+  residential, flat, >=120 m2        93
+  addressable footprint              61,067 m2
+
+============================================================================
+3-4 · SHADE AND YIELD — one panel at a time, 8,760 hours each
+============================================================================
+  panels placed                      5,538   (34s)
+  installed capacity                 2,492 kWp
+  panel yield  min / median / max    564 / 756 / 758 kWh/yr
+  worst panel vs best                -26%   <- why the unit of analysis is a panel, not a system
+  sky view factor min / median       0.77 / 0.97
+  specific yield in situ             1,654 kWh/kWp   vs 1,800 unshaded at 37deg
+  cost of the city, in yield         -8%   (flatter tilt, parapets, neighbours, rows)
+
+============================================================================
+5 · TILT — the per-panel optimum is not the per-roof optimum
+============================================================================
+  test roof: OSM 118513009, 2,826 m2 footprint
+  tilt    panels   kWh/panel    roof total     index
+    5deg     583         712      415,199 kWh     100.0%   <- most energy
+   10deg     460         737      339,046 kWh      81.7%
+   15deg     370         757      280,115 kWh      67.5%
+   25deg     286         782      223,592 kWh      53.9%
+   37deg     222         785      174,348 kWh      42.0%
+
+  Per panel, steeper is better: 37deg earns ~4% more than 15deg.
+  Per roof, steeper is worse: row pitch scales with sin(tilt), so 37deg fits
+  half the panels. The roof is the scarce input, not the module.
+  I would still not build the 5deg case. At that angle rain does not clear
+  the glass, so the soiling loss this model holds constant at 2.5% would
+  roughly double in a Madrid summer, and the panels would need washing.
+  15deg is the practical answer, and the reason is maintenance, not physics.
+
+============================================================================
+6 · DEMAND — the Spanish clock is a first-order input
+============================================================================
+  annual demand, one dwelling        3,000 kWh
+  P1 punta share of demand            29.0%   at 0.209 EUR/kWh
+  P2 llano share of demand            27.0%   at 0.118 EUR/kWh
+  P3 valle share of demand            44.0%   at 0.093 EUR/kWh
+  demand-weighted import price       0.1334 EUR/kWh
+  export compensation                0.0500 EUR/kWh   ratio 2.7 : 1
+
+  That ratio is the whole economic problem. A kWh kept inside the house is
+  worth nearly three times a kWh pushed onto the grid. So the model's
+  accuracy about when the household is home matters more than its accuracy
+  about when the sun shines.
+
+============================================================================
+7 · UNIT ECONOMICS — one flat alone, or the whole building
+============================================================================
+  Cost structure first, because it decides the answer:
+     1 panels    0.5 kWp     5,056 EUR   11.24 EUR/Wp   fixed share   95%
+     2 panels    0.9 kWp     5,333 EUR    5.93 EUR/Wp   fixed share   90%
+     4 panels    1.8 kWp     5,887 EUR    3.27 EUR/Wp   fixed share   81%
+     8 panels    3.6 kWp     6,994 EUR    1.94 EUR/Wp   fixed share   68%
+    16 panels    7.2 kWp     9,208 EUR    1.28 EUR/Wp   fixed share   52%
+    32 panels   14.4 kWp    13,637 EUR    0.95 EUR/Wp   fixed share   35%
+    marginal cost of one more panel, at any size: 277 EUR
+    fully loaded cost of a 1-panel job:          5,056 EUR
+    The marginal cost is flat. The average is not, because EUR 4,780 of
+    inverter, scaffold, board and paperwork does not care how many
+    panels it carries. Below about eight panels the fixed cost IS
+    the project.
+
+  Test roof: OSM 118513009 — 2,826 m2, 6 floors, 118 dwellings,
+  room for 370 panels (166 kWp).
+
+  scenario                             panels   kWp  EUR/Wp  EUR/dwelling  SCR  payback
+  one flat, own share                      3    1.4   4.16      5,610   44%    never
+  one flat, own share + storage            3    1.4   7.07      9,542   99%    never
+  whole building, collective             370  166.5   0.64        908   46%    4.3y
+  whole building, collective + storage   370  166.5   3.43      4,841   99%   14.2y
+
+  The comparison that matters:
+    one flat acting alone         3 panel(s), 4.16 EUR/Wp, payback never
+    the same roof, done together  370 panels, 0.64 EUR/Wp, payback 4.3 yr
+    cost per dwelling             5,610 -> 908 EUR  (84% lower)
+    self-consumption              44% -> 46%
+
+  A claim I had to withdraw. I expected that pooling this many
+  staggered households would raise self-consumption materially. It
+  does not. The aggregate curve is genuinely flatter, but the solar
+  surplus arrives at midday and almost nobody's routine moves into
+  midday. Diversity smooths the evening peak, which is the wrong peak.
+
+  So the whole gain from doing the building together is cost
+  amortisation: EUR 4,780 of inverter, scaffold, board and
+  paperwork divided by 118 dwellings instead of one. That is enough on its
+  own to move the project from never paying back to 4.3 years — but it is
+  a different mechanism from the one I assumed, and it changes what
+  you would sell. The pitch is shared cost, not shared consumption.
+
+  So the product is not a solar panel. It is a signed resolution from a
+  comunidad de propietarios, with a solar panel attached. Everything about
+  how you would go to market follows from that.
+
+============================================================================
+8 · WHY THE SAME HARDWARE EARNS LESS HERE THAN IN BRITAIN
+============================================================================
+  Comparators are cited, not modelled. Sources in README.
+  specific yield, Madrid in situ     1,654 kWh/kWp
+  specific yield, London typical     950 kWh/kWp   Madrid advantage 1.74x
+  retail energy, Madrid weighted     0.133 EUR/kWh
+  retail energy, GB unit rate        0.305 EUR/kWh   (26.1 p/kWh)   GB advantage 2.29x
+
+  roof available, Madrid flat        0.97 kWp per dwelling
+  roof available, GB semi            4.00 kWp per dwelling   GB advantage 4.1x
+
+  gross value of one household's roof, per year:
+    Madrid   1,598 kWh x 0.133 = 213 EUR
+    GB       3,800 kWh x 0.305 = 1,161 EUR   ratio 5.4x
+
+  Three structural facts, all pointing the same way, none of them about sun:
+    1. Six floors share one roof, so there is a quarter of the capacity per
+       household.
+    2. The Spanish three-period tariff puts 44% of demand in the cheap valle
+       band, so the avoided price is roughly half the British flat rate.
+    3. Export compensation is capped monthly at the energy term and the
+       surplus is forfeited, so oversizing earns nothing.
+
+  Madrid has 1.8x Britain's sunshine and a fraction of the value per household.
+  That is the thing I would want to be wrong about, and it is the first
+  question I would take to whoever owns the Spain plan.
+
+============================================================================
+9 · STORAGE — what it must earn elsewhere to make sense
+============================================================================
+  collective system: 370 panels, 118 dwellings, 590 kWh of storage
+  self-consumption without storage   46%
+  self-consumption with storage      99%
+  extra benefit from arbitrage only  12,364 EUR/yr
+  storage capex                      306,800 EUR
+  simple payback on tariff shifting  25 years   against a 24-year cycle life
+
+  Storage does not pay for itself on the retail spread in Spain. The valle
+  band at 0.093 EUR/kWh is too cheap for arbitrage to work: shifting a
+  kWh from export to evening use earns about 0.16 EUR, and the battery
+  needs thousands of those cycles to repay itself.
+  To reach an 8-year payback it would need to earn another 25,986 EUR/yr
+  from somewhere other than the customer's bill — balancing, capacity, or
+  wholesale spreads captured by an aggregator.
+
+  Which is the actual argument for vertical integration, and it is an
+  arithmetic one rather than a slogan: a domestic battery is a bad household
+  investment and a good trading asset. The margin lives in the dispatch,
+  not in the hardware. If that is right, the company should own the battery
+  and sell the household a tariff — and I would want to test that against
+  whoever runs the book, because it is exactly the kind of claim that dies
+  on contact with real imbalance costs.
+
+============================================================================
+10 · THE ROUTE AROUND THE CONSTRAINT — plug-in balcony kit
+============================================================================
+  street canyon obstruction          26deg elevation (6 floors opposite, 20 m street)
+  vertical south panel, in street    382 kWh/yr
+  same panel on the roof             744 kWh/yr   -> vertical mount costs 49%
+  2 panels before clipping          765 kWh/yr
+  after the 800 W inverter cap        765 kWh/yr   clipped 0 kWh (0.0%)
+
+  Worth noting: the 800 W cap is not binding. A vertical panel in a street
+  canyon never reaches its rating, so the regulatory limit costs almost
+  nothing here. That is useful for product design — the constraint people
+  argue about is not the one that matters.
+
+  retail kit, self-installed          620 EUR     87 EUR/yr   SCR  71%   payback  7.4 yr
+  Fuse bundle, stated price point   2,000 EUR    108 EUR/yr   SCR 100%   payback 17.5 yr
+
+  RECONCILING WITH THE PUBLIC NUMBER
+  The stated product is about 2,000 with a roughly three-year payback.
+  Three years on 2,000 needs 667 EUR/yr of benefit. I cannot get there from
+  Spanish retail prices: at a demand-weighted 0.133 EUR/kWh it would
+  take 4,998 kWh/yr fully self-consumed, which is more than twice what two
+  balcony panels can physically produce in a Madrid street.
+
+  So either the figure is a GB figure, or the array is larger than a balcony
+  kit, or the price is subsidised by the tariff the customer signs. At the
+  GB unit rate of 26.1 p/kWh and near-total self-consumption the claim is close to
+  reproducible, which makes me think it is a GB number quoted in dollars.
+  That is not a criticism, it is the question I would ask: does the Spanish
+  configuration need to be bigger, and if so does it still fit on a balcony?
+
+  Why this product still wins in Madrid despite the worse yield: it needs no
+  roof rights, no junta vote, no scaffold, no installer and no CIE. It trades
+  half the sun for the whole of the addressable market. In a city where the
+  roof is a common element, that is the better trade.
+  Regulatory status: disputed — see README section 6
+
+============================================================================
+11 · FROM ONE BLOCK TO THE CITY — and what actually binds
+============================================================================
+  block   93 roofs, 5,538 panels, 2,492 kWp, 4,122 MWh/yr
+  dwellings beneath them             2,580
+  ROOF PER DWELLING                  0.97 kWp   (1,598 kWh/yr)
+
+  City extrapolation. Ranges, because these inputs do not deserve point estimates.
+  dwellings, main residence          1,300,000   conf: med
+  in multifamily blocks              1,144,000 (88%)   conf: LOW, most sensitive input in this section
+    low      0.58 kWp/dwelling  ->     663 MW technical potential
+    central  0.97 kWp/dwelling  ->   1,105 MW technical potential
+    high     1.35 kWp/dwelling  ->   1,547 MW technical potential
+  balcony kit per flat               765 kWh/yr
+  flats with a usable balcony        629,200 (55%)   conf: LOW
+  balcony-addressable energy         481 GWh/yr   (0.48 TWh)
+
+  THE CONSTRAINT
+  Not irradiance. Not module cost. Not grid connection at this scale.
+  In an apartment city the roof is a common element under the Ley de Propiedad
+  Horizontal. Selling a rooftop system means winning a vote at a junta de
+  propietarios: one third of owners and one third of quotas, on a roughly
+  40-day meeting cycle, with no single decision-maker to sell to.
+  And 28% of these households are tenants who cannot authorise it at all.
+
+  So the deployment rate is set by the sales cycle, not by the sun. Which
+  makes this an operations problem rather than an engineering one — and the
+  three things I would measure first are the time from first contact to a
+  signed resolution, the conversion rate at the junta, and the share of
+  buildings where one owner can be made the internal champion.
+
+============================================================================
+12 · WHAT WOULD HAVE TO BE TRUE FOR THIS TO BE WRONG
+============================================================================
+  base case: collective, 370 panels, 118 dwellings, no storage
+  base payback: 4.2 years
+
+  input                                   low     high   swing
+  export compensation  0.03 / 0.10 EUR     4.8     3.3     1.5 yr
+  real price drift     0% / 4%             4.4     4.1     0.3 yr
+  roof access          400 / 1600 EUR      4.2     4.3     0.1 yr
+  installer margin     15% / 35%           3.9     4.6     0.7 yr
+  module price         35 / 75 EUR         3.9     4.7     0.9 yr
+  soiling              1% / 5%             4.2     4.3     0.1 yr
+  labour per panel     60 / 130 EUR        3.6     5.1     1.5 yr
+
+  Most sensitive: export compensation — 1.5 years of payback.
+  It is a commercial and regulatory input, not a physical one. Which is the
+  general shape of this whole study: the physics is the easy half.
+
+  Named failure modes, in the order I would attack them:
+   1. The load curve is synthetic. Self-consumption is the most valuable output
+     of this model and it rests on a shape I invented. Fix: the distributor's
+     quarter-hourly curve, which any customer can authorise release of.
+   2. Dwellings per building is derived from footprint and floor count, not
+     counted. It is the denominator of the headline result. Fix: Catastro
+     dwelling register.
+   3. 94% of building heights are inferred from typology. Demoted from first
+     after the shading attribution: all urban obstruction is worth 2.3% of
+     yield on this block, so a one-storey error costs a fraction of a percent. It will matter where the
+     cornice line is irregular. Fix: Catastro INSPIRE floor counts
+     joined to PNOA LiDAR. Two days' work.
+   4. Shading is binary per panel rather than per cell string. With real series
+     inverters the electrical loss from partial shade exceeds the geometric
+     loss. Direction of error: optimistic.
+   5. Rooftop obstruction share (22%) was eyeballed from aerial imagery on one
+     block, and it is a sensitive input. It deserves a survey.
+   6. The model assumes the 2.0TD band structure survives 30 years. It will not.
+     Tariff reform is a live risk to any 30-year NPV here.
+   7. July and August clearness sit at 0.98 of clear-sky, which leaves no room
+     for a hazy summer. Calima events would cut this and the model cannot
+     see them. Direction of error: optimistic on summer yield.
+   8. One block, one typology. The Ensanche is not Vallecas, Tetuan or the
+     post-war periphery, where roofs are sloped, lower and differently owned.
+     The city extrapolation is the weakest part of this study.
+
+============================================================================
+13 · EXPORT
+============================================================================
+  outputs/madrid_block.json          684 kB

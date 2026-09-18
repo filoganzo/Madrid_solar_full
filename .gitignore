@@ -1,0 +1,19 @@
+# Environments and caches
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Generated: `python build_web.py` rebuilds this from outputs/
+web/data.json
+
+# The Overpass tile cache. Large, reproducible with `python fetch_city.py`,
+# and not ours to redistribute in bulk - the extract that the study actually
+# uses is committed instead.
+data/city/tiles/
+
+# Personal: the covering email, not part of the study
+EMAIL.md
+
+# Development scratch extract; the real one is data/city/osm_city.json
+data/city/osm_partial.json
